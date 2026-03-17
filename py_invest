@@ -1,0 +1,122 @@
+import math
+import random
+import datetime
+import statistics
+import locale
+import sys
+
+try:
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+except:
+    locale.setlocale(locale.LC_ALL, '')
+
+
+def converter_taxa(anual):
+    return (1 + anual / 100) ** (1 / 12) - 1
+
+
+def calcular_fv(p, a, i, n):
+    if i == 0: return p + (a * n)
+    return p * (1 + i) ** n + a * (((1 + i) ** n - 1) / i)
+
+
+def rodar_pyinvest():
+    print("==================== PY INVEST ====================")
+
+    c_ini = float(input("Capital Inicial (R$): "))
+    a_men = float(input("Aporte Mensal (R$): "))
+    prazo = int(input("Prazo (meses): "))
+
+    if c_ini < 0 or a_men < 0 or prazo <= 0:
+        print("Erro: Dados de entrada devem ser positivos.")
+        sys.exit()
+
+    cdi_a = float(input("CDI Anual (%): "))
+    p_cdb = float(input("Percentual CDI no CDB (%): "))
+    p_lci = float(input("Percentual CDI na LCI (%): "))
+    r_fii = float(input("Rentabilidade FII (%): "))
+    meta = float(input("Meta Financeira (R$): "))
+
+    taxa_cdi_m = converter_taxa(cdi_a)
+
+    taxa_cdb = taxa_cdi_m * (p_cdb / 100)
+    v_cdb_bruto = calcular_fv(c_ini, a_men, taxa_cdb, prazo)
+    lucro_cdb = v_cdb_bruto - (c_ini + (a_men * prazo))
+
+    dias = prazo * 30
+    if dias <= 180:
+        ir = 0.225
+    elif dias <= 360:
+        ir = 0.20
+    elif dias <= 720:
+        ir = 0.175
+    else:
+        ir = 0.15
+    v_cdb_final = v_cdb_bruto - (lucro_cdb * ir)
+
+    taxa_lci = taxa_cdi_m * (p_lci / 100)
+    v_lci_final = calcular_fv(c_ini, a_men, taxa_lci, prazo)
+
+    v_pou_final = calcular_fv(c_ini, a_men, 0.005, prazo)
+
+    base_fii = calcular_fv(c_ini, a_men, r_fii / 100, prazo)
+    s1 = base_fii * (1 + random.uniform(-0.03, 0.03))
+    s2 = base_fii * (1 + random.uniform(-0.03, 0.03))
+    s3 = base_fii * (1 + random.uniform(-0.03, 0.03))
+    s4 = base_fii * (1 + random.uniform(-0.03, 0.03))
+    s5 = base_fii * (1 + random.uniform(-0.03, 0.03))
+
+    fii_dados = (s1, s2, s3, s4, s5)
+    v_fii_media = statistics.mean(fii_dados)
+
+    v_max = max(v_cdb_final, v_lci_final, v_pou_final, v_fii_media)
+    b_cdb = int((v_cdb_final / v_max) * 50)
+    b_lci = int((v_lci_final / v_max) * 50)
+    b_pou = int((v_pou_final / v_max) * 50)
+    b_fii = int((v_fii_media / v_max) * 50)
+
+    hoje = datetime.date.today()
+    resgate = hoje + datetime.timedelta(days=prazo * 30)
+
+    print("\n" + "-" * 50)
+    print(f"RELATÓRIO PY INVEST - {hoje.strftime('%d/%m/%Y')}")
+    print(f"Data estimada de resgate: {resgate.strftime('%d/%m/%Y')}")
+    print(f"Total investido: {locale.currency(c_ini + (a_men * prazo), grouping=True)}")
+    print("-" * 50)
+
+    print(f"            : {locale.currency(v_cdb_final, grouping=True)}")
+    print(f"CDB         : {'█' * b_cdb}")
+
+    print(f"            : {locale.currency(v_lci_final, grouping=True)}")
+    print(f"LCI/LCA     : {'█' * b_lci}")
+
+    print(f"            : {locale.currency(v_pou_final, grouping=True)}")
+    print(f"Poupança    : {'█' * b_pou}")
+
+    print(f"            : {locale.currency(v_fii_media, grouping=True)}")
+    print(f"FII (Média) : {'█' * b_fii}")
+
+    print("-" * 50)
+    print(f"Estatísticas FII (Mediana): {locale.currency(statistics.median(fii_dados), grouping=True)}")
+    print(f"Desvio Padrão FII: {locale.currency(statistics.stdev(fii_dados), grouping=True)}")
+
+    print(f"Meta atingida? {'Sim' if v_max >= meta else 'Não'}")
+
+    if v_max == v_cdb_final:
+        melhor = "CDB"
+    elif v_max == v_lci_final:
+        melhor = "LCI/LCA"
+    elif v_max == v_pou_final:
+        melhor = "Poupança"
+    else:
+        melhor = "FII (Média)"
+    print(f"\nMelhor opção: {melhor} com {locale.currency(v_max, grouping=True)}")
+print("\n" + "-" * 50)
+
+
+if __name__ == "__main__":
+    rodar_pyinvest()
+
+print("========== CONSULTORIA FINALIZADA, OBRIGADO!!! ==========")
+print(" " * 80)
+input("Pressione Enter para Sair...")
