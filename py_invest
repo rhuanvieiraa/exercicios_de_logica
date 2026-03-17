@@ -3,120 +3,140 @@ import random
 import datetime
 import statistics
 import locale
-import sys
 
-try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-except:
-    locale.setlocale(locale.LC_ALL, '')
-
+# Configura a localização para o padrão do sistema (formatação de moeda R$)
+locale.setlocale(locale.LC_ALL, '')
 
 def converter_taxa(anual):
+    """Converte uma taxa de juros anual para mensal (equivalência de juros compostos)."""
     return (1 + anual / 100) ** (1 / 12) - 1
 
 
 def calcular_fv(p, a, i, n):
-    if i == 0: return p + (a * n)
+    """
+    Calcula o Valor Futuro (FV) de um investimento.
+    p: Capital Inicial (Present Value)
+    a: Aporte Mensal (Anuidade)
+    i: Taxa de juros por período
+    n: Número de períodos (meses)
+    """
+    if i == 0:
+        return p + (a * n)
+    # Fórmula: Montante do capital inicial + Montante acumulado dos aportes mensais
     return p * (1 + i) ** n + a * (((1 + i) ** n - 1) / i)
 
 
 def rodar_pyinvest():
-    print("==================== PY INVEST ====================")
+    print("==================== PYINVEST ====================")
 
+    # Coleta de dados básicos do usuário
     c_ini = float(input("Capital Inicial (R$): "))
     a_men = float(input("Aporte Mensal (R$): "))
     prazo = int(input("Prazo (meses): "))
 
+    # Validação simples para evitar cálculos com valores negativos ou prazo zero
     if c_ini < 0 or a_men < 0 or prazo <= 0:
         print("Erro: Dados de entrada devem ser positivos.")
-        sys.exit()
-
-    cdi_a = float(input("CDI Anual (%): "))
-    p_cdb = float(input("Percentual CDI no CDB (%): "))
-    p_lci = float(input("Percentual CDI na LCI (%): "))
-    r_fii = float(input("Rentabilidade FII (%): "))
-    meta = float(input("Meta Financeira (R$): "))
-
-    taxa_cdi_m = converter_taxa(cdi_a)
-
-    taxa_cdb = taxa_cdi_m * (p_cdb / 100)
-    v_cdb_bruto = calcular_fv(c_ini, a_men, taxa_cdb, prazo)
-    lucro_cdb = v_cdb_bruto - (c_ini + (a_men * prazo))
-
-    dias = prazo * 30
-    if dias <= 180:
-        ir = 0.225
-    elif dias <= 360:
-        ir = 0.20
-    elif dias <= 720:
-        ir = 0.175
     else:
-        ir = 0.15
-    v_cdb_final = v_cdb_bruto - (lucro_cdb * ir)
+        # Coleta de indicadores de mercado e metas
+        cdi_a = float(input("CDI Anual (%): "))
+        p_cdb = float(input("Percentual CDI no CDB (%): "))
+        p_lci = float(input("Percentual CDI na LCI (%): "))
+        r_fii = float(input("Rentabilidade FII (%): "))
+        meta = float(input("Meta Financeira (R$): "))
 
-    taxa_lci = taxa_cdi_m * (p_lci / 100)
-    v_lci_final = calcular_fv(c_ini, a_men, taxa_lci, prazo)
+        # Cálculos de rentabilidade para Renda Fixa
+        taxa_cdi_m = converter_taxa(cdi_a)
 
-    v_pou_final = calcular_fv(c_ini, a_men, 0.005, prazo)
+        # Cálculo do CDB (Incide Imposto de Renda sobre o lucro)
+        taxa_cdb = taxa_cdi_m * (p_cdb / 100)
+        v_cdb_bruto = calcular_fv(c_ini, a_men, taxa_cdb, prazo)
+        lucro_cdb = v_cdb_bruto - (c_ini + (a_men * prazo))
 
-    base_fii = calcular_fv(c_ini, a_men, r_fii / 100, prazo)
-    s1 = base_fii * (1 + random.uniform(-0.03, 0.03))
-    s2 = base_fii * (1 + random.uniform(-0.03, 0.03))
-    s3 = base_fii * (1 + random.uniform(-0.03, 0.03))
-    s4 = base_fii * (1 + random.uniform(-0.03, 0.03))
-    s5 = base_fii * (1 + random.uniform(-0.03, 0.03))
+        # Tabela regressiva de IR para Renda Fixa (CDB) baseada em dias
+        dias = prazo * 30
+        if dias <= 180:
+            ir = 0.225
+        elif dias <= 360:
+            ir = 0.20
+        elif dias <= 720:
+            ir = 0.175
+        else:
+            ir = 0.15
+        v_cdb_final = v_cdb_bruto - (lucro_cdb * ir)
 
-    fii_dados = (s1, s2, s3, s4, s5)
-    v_fii_media = statistics.mean(fii_dados)
+        # LCI/LCA e Poupança são isentos de IR para pessoa física
+        v_lci_final = calcular_fv(c_ini, a_men, taxa_cdi_m * (p_lci / 100), prazo)
+        v_pou_final = calcular_fv(c_ini, a_men, 0.005, prazo) # Poupança estimada em 0.5% a.m.
 
-    v_max = max(v_cdb_final, v_lci_final, v_pou_final, v_fii_media)
-    b_cdb = int((v_cdb_final / v_max) * 50)
-    b_lci = int((v_lci_final / v_max) * 50)
-    b_pou = int((v_pou_final / v_max) * 50)
-    b_fii = int((v_fii_media / v_max) * 50)
+        # Simulação de FIIs: Gera 5 cenários com variação aleatória de +/- 3% (volatilidade)
+        base_fii = calcular_fv(c_ini, a_men, r_fii / 100, prazo)
+        s1 = base_fii * (1 + random.uniform(-0.03, 0.03))
+        s2 = base_fii * (1 + random.uniform(-0.03, 0.03))
+        s3 = base_fii * (1 + random.uniform(-0.03, 0.03))
+        s4 = base_fii * (1 + random.uniform(-0.03, 0.03))
+        s5 = base_fii * (1 + random.uniform(-0.03, 0.03))
 
-    hoje = datetime.date.today()
-    resgate = hoje + datetime.timedelta(days=prazo * 30)
+        fii_dados = (s1, s2, s3, s4, s5)
+        v_fii_media = statistics.mean(fii_dados)
 
-    print("\n" + "-" * 50)
-    print(f"RELATÓRIO PY INVEST - {hoje.strftime('%d/%m/%Y')}")
-    print(f"Data estimada de resgate: {resgate.strftime('%d/%m/%Y')}")
-    print(f"Total investido: {locale.currency(c_ini + (a_men * prazo), grouping=True)}")
-    print("-" * 50)
+        # Lógica para criação do gráfico de barras proporcional ao maior valor
+        v_max = max(v_cdb_final, v_lci_final, v_pou_final, v_fii_media)
+        b_cdb = int((v_cdb_final / v_max) * 50)
+        b_lci = int((v_lci_final / v_max) * 50)
+        b_pou = int((v_pou_final / v_max) * 50)
+        b_fii = int((v_fii_media / v_max) * 50)
 
-    print(f"            : {locale.currency(v_cdb_final, grouping=True)}")
-    print(f"CDB         : {'█' * b_cdb}")
+        # Manipulação de datas para o relatório
+        hoje = datetime.date.today()
+        resgate = hoje + datetime.timedelta(days=prazo * 30)
 
-    print(f"            : {locale.currency(v_lci_final, grouping=True)}")
-    print(f"LCI/LCA     : {'█' * b_lci}")
+        # Exibição do Relatório Final
+        print("-" * 50)
+        print(f"RELATÓRIO PYINVEST - {hoje.strftime('%d/%m/%Y')}")
+        print(f"Data estimada de resgate: {resgate.strftime('%d/%m/%Y')}")
+        print(f"Total investido: {locale.currency(c_ini + (a_men * prazo), grouping=True)}")
+        print("-" * 50)
 
-    print(f"            : {locale.currency(v_pou_final, grouping=True)}")
-    print(f"Poupança    : {'█' * b_pou}")
+        # Impressão dos resultados e mini-gráficos
+        print(f"CDB           {locale.currency(v_cdb_final, grouping=True)}")
+        print(f"Gráfico     : {'█' * b_cdb}")
 
-    print(f"            : {locale.currency(v_fii_media, grouping=True)}")
-    print(f"FII (Média) : {'█' * b_fii}")
+        print(f"LCI/LCA       {locale.currency(v_lci_final, grouping=True)}")
+        print(f"Gráfico     : {'█' * b_lci}")
 
-    print("-" * 50)
-    print(f"Estatísticas FII (Mediana): {locale.currency(statistics.median(fii_dados), grouping=True)}")
-    print(f"Desvio Padrão FII: {locale.currency(statistics.stdev(fii_dados), grouping=True)}")
+        print(f"Poupança      {locale.currency(v_pou_final, grouping=True)}")
+        print(f"Gráfico     : {'█' * b_pou}")
 
-    print(f"Meta atingida? {'Sim' if v_max >= meta else 'Não'}")
+        print(f"FII (Média)   {locale.currency(v_fii_media, grouping=True)}")
+        print(f"Gráfico     : {'█' * b_fii}")
 
-    if v_max == v_cdb_final:
-        melhor = "CDB"
-    elif v_max == v_lci_final:
-        melhor = "LCI/LCA"
-    elif v_max == v_pou_final:
-        melhor = "Poupança"
-    else:
-        melhor = "FII (Média)"
-    print(f"\nMelhor opção: {melhor} com {locale.currency(v_max, grouping=True)}")
+        print("-" * 50)
+        # Informações estatísticas adicionais sobre a volatilidade dos FIIs
+        print(f"Estatísticas FII (Mediana): {locale.currency(statistics.median(fii_dados), grouping=True)}")
+        print(f"Desvio Padrão FII: {locale.currency(statistics.stdev(fii_dados), grouping=True)}")
+
+        # Verificação da meta financeira
+        meta_ok = "Não"
+        if v_max >= meta:
+            meta_ok = "Sim"
+        print(f"Meta atingida? {meta_ok}")
+
+        # Identificação da melhor opção de investimento entre as simuladas
+        if v_max == v_cdb_final:
+            melhor = "CDB"
+        elif v_max == v_lci_final:
+            melhor = "LCI/LCA"
+        elif v_max == v_pou_final:
+            melhor = "Poupança"
+        else:
+            melhor = "FII (Média)"
+
+        print(f"\nMelhor opção: {melhor} com {locale.currency(v_max, grouping=True)}")
+
+# Inicia a execução do programa
+rodar_pyinvest()
+
 print("\n" + "-" * 50)
-
-
-if __name__ == "__main__":
-    rodar_pyinvest()
-
-print("========== CONSULTORIA FINALIZADA, OBRIGADO!!! ==========")
-print(" " * 80)
+print("========== CONSULTORIA FINALIZADA OBRIGADO ==========")
 input("Pressione Enter para Sair...")
